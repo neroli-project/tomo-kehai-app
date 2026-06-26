@@ -118,13 +118,13 @@ onValue(roomRef, (snapshot) => {
 window.changeStatus = function(statusText) {
     let effect = "";
     if (statusText.includes('まったり')) effect = '☕️🍀🏠';
-    else if (statusText.includes('仕事頑張ってる')) effect = '🔥💪😤';
+    else if (statusText.includes('勉強がんばる')) effect = '🔥💪😤';
     else if (statusText.includes('パソコン')) effect = '💻👀⚡️';
     else if (statusText.includes('おやつ')) effect = '🍰🍩🧋';
     else if (statusText.includes('寝るね')) effect = '🌙💤⭐️';
-    else if (statusText.includes('愛してる')) effect = '❤️❤️❤️';
-    else if (statusText.includes('大好き')) effect = '💖✨💘';
-
+    else if (statusText.includes('また明日')) effect = '❤️❤️❤️';
+    else if (statusText.includes('夜更かし草')) effect = '💖✨💘';
+    
     triggerEffect(effect);
     saveDataToServer(statusText, effect);
 }
