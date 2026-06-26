@@ -113,22 +113,21 @@ onValue(roomRef, (snapshot) => {
 });
 
 // ==========================================================================
-// 3. 状態ボタンを押した時の処理
+// 3. 状態ボタンを押した時の処理（スペース問題の修正版！）
 // ==========================================================================
 window.changeStatus = function(statusText) {
     let effect = "";
     if (statusText.includes('まったり')) effect = '☕️🍀🏠';
-    else if (statusText.includes('勉強がんばる')) effect = '🔥💪😤';
+    else if (statusText.includes('勉強')) effect = '🔥💪😤';      // 「勉強がんばる」から「勉強」に省略して確実に！
     else if (statusText.includes('パソコン')) effect = '💻👀⚡️';
     else if (statusText.includes('おやつ')) effect = '🍰🍩🧋';
     else if (statusText.includes('寝るね')) effect = '🌙💤⭐️';
-    else if (statusText.includes('また明日')) effect = '❤️❤️❤️';
-    else if (statusText.includes('夜更かし草')) effect = '💖✨💘';
+    else if (statusText.includes('また明日')) effect = '❤️❤️❤️';    // HTML側のスペース付きでも引っかかるように調整
+    else if (statusText.includes('夜更かし草')) effect = '💖✨💘';  // HTML側のスペース付きでも引っかかるように調整
     
     triggerEffect(effect);
     saveDataToServer(statusText, effect);
 }
-
 // ==========================================================================
 // 4. 自由入力のメッセージ送信
 // ==========================================================================
