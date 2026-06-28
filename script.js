@@ -229,3 +229,25 @@ onValue(myRef, (snapshot) => {
         }
     }
 });
+
+// ==========================================================================
+// 🔍 【新機能】写真をタップした時に大きく拡大する魔法
+// ==========================================================================
+
+// 写真を拡大して表示する関数
+window.zoomPhoto = function(element) {
+    const modal = document.getElementById('photo-zoom-modal');
+    const zoomedImg = document.getElementById('zoomed-photo');
+    if (modal && zoomedImg) {
+        zoomedImg.src = element.src; // タップされた画像のURLをコピー
+        modal.style.display = 'flex'; // 拡大画面を表示！
+    }
+}
+
+// 拡大画面を閉じる関数
+window.closeZoomModal = function() {
+    const modal = document.getElementById('photo-zoom-modal');
+    if (modal) {
+        modal.style.display = 'none'; // 拡大画面を非表示に！
+    }
+}
