@@ -251,3 +251,35 @@ window.closeZoomModal = function() {
         modal.style.display = 'none'; // 拡大画面を非表示に！
     }
 }
+
+// ==========================================================================
+// 📸 【新機能】インスタ風画面切り替え（タブ機能）の魔法
+// ==========================================================================
+window.switchTab = function(tabName) {
+    const myArea = document.getElementById('my-area');
+    const partnerArea = document.getElementById('partner-area');
+    const tabMyBtn = document.getElementById('tab-my');
+    const tabPartnerBtn = document.getElementById('tab-partner');
+
+    if (tabName === 'my') {
+        // 「じぶん」を表示、相手を隠す
+        myArea.style.display = 'block';
+        partnerArea.style.display = 'none';
+        
+        // ボタンの色をアクティブ（緑）にする
+        tabMyBtn.style.color = '#4caf50';
+        tabMyBtn.style.borderBottom = '3px solid #4caf50';
+        tabPartnerBtn.style.color = '#888';
+        tabPartnerBtn.style.borderBottom = '3px solid transparent';
+    } else {
+        // 「あいて」を表示、自分を隠す
+        myArea.style.display = 'none';
+        partnerArea.style.display = 'block';
+        
+        // ボタンの色をアクティブ（緑）にする
+        tabPartnerBtn.style.color = '#4caf50';
+        tabPartnerBtn.style.borderBottom = '3px solid #4caf50';
+        tabMyBtn.style.color = '#888';
+        tabMyBtn.style.borderBottom = '3px solid transparent';
+    }
+}
