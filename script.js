@@ -283,3 +283,10 @@ window.switchTab = function(tabName) {
         tabMyBtn.style.borderBottom = '3px solid transparent';
     }
 }
+
+// アプリを開いた瞬間に、自動で「あいて」のタブを最初に選んでおく魔法
+window.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.switchTab === 'function') {
+        window.switchTab('partner');
+    }
+});
