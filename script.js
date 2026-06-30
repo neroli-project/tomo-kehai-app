@@ -20,22 +20,85 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // ==========================================================================
-// 👥 【進化版】URLから「部屋名」と「自分の名前」を読み取る仕組み
+// 🚨 URLからお部屋の名前と自分の名前を読み取る設定
 // ==========================================================================
 const urlParams = new URLSearchParams(window.location.search);
-let roomId = urlParams.get('room');   // 部屋の合言葉（例: neroli_cafe）
-let myId = urlParams.get('myname');   // 自分の名前（例: neroli）
+const roomId = urlParams.get('room');
+const myId = urlParams.get('myname');
 
-// もしURLに入力漏れがあったときのセーフティ
-if (!roomId) roomId = "default_room";
-if (!myId) myId = "user1";
+// 💡部屋名か名前が空っぽなら、ログイン画面を表示して処理をストップする！
+if (!roomId || !myId) {
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('login-container').style.display = 'block';
+        document.getElementById('app-container').style.display = 'none';
+    });
+} else {
+    // 部屋名と名前がある時だけ、いつものお部屋を表示する！
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('login-container').style.display = 'none';
+        document.getElementById('app-container').style.display = 'block';
+    });
+}
 
-console.log(`現在の部屋: 【 ${roomId} 】 / あなたの名前: 【 ${myId} 】`);
+// ==========================================================================
+// 🔑 ログイン＆招待リンク生成の処理
+// ==========================================================================
+let generatedInviteUrl = "";
+let nextJumpUrl = "";
+let currentRoomName = ""; // 💡 入力されたお部屋の名前をキープしておく変数
 
-// データベースの保存先を『指定した部屋の中の、自分の名前の枠』にする
-const myRef = ref(database, `rooms/${roomId}/users/${myId}`);
-// 部屋全体のデータを監視するためのピン留め
-const roomRef = ref(database, `rooms/${roomId}/users`);
+// 💡 1つ目のボタン：入力内容をチェックして招待画面をポッと出す
+window.loginToRoom = function() {
+    const roomInput = document.getElementById('input-room').value.trim();
+    const nameInput = document.getElementById('input-name').value.trim();
+    
+    if (!roomInput || !nameInput) {
+        alert('お部屋の名前と、あなたの名前を入力してね！');
+        return;
+    }
+    
+    // 💡 入力された部屋名を後で使うために覚えさせておくよ！
+    currentRoomName = roomInput;
+    
+    // 相手に送る用のベースURLを自動で作るよ
+    const baseUrl = window.location.origin + window.location.pathname;
+    generatedInviteUrl = `${baseUrl}?room=${encodeURIComponent(roomInput)}`;
+    
+    // 自分が後で入る用のURLもキープしておくよ
+    nextJumpUrl = `${baseUrl}?room=${encodeURIComponent(roomInput)}&myname=${encodeURIComponent(nameInput)}`;
+    
+    // 入力欄を隠して、招待コピー画面をポッと出す！
+    document.getElementById('login-form-fields').style.display = 'none';
+    document.getElementById('invite-area').style.display = 'block';
+}
+
+// 💡 招待メッセージをクリップボードに自動コピーする魔法
+window.copyInviteMessage = function() {
+    // 👇 ここがポイント！ 「〇〇〇」だった部分に、自動で実際の部屋名が入るよ！
+    const message = `ふたりの「今の気配」がわかるアプリを作ってみたよ！🌸\n\n下のURLを開いて、ふたりの部屋名（${currentRoomName}）とあなたの好きなお名前を入れるだけで合流できるよ！待ってるね🥰👇\n${generatedInviteUrl}`;
+    
+    navigator.clipboard.writeText(message).then(() => {
+        alert('📋 LINE用の招待メッセージをコピーしたよ！そのまま貼り付けて送ってね。'); // 「送ね」のタイポも直しておいたよ！
+    }).catch(err => {
+        alert('コピーに失敗しちゃった。文字を直接選択してコピーしてね！');
+    });
+}
+
+// 💡 2つ目のボタン：コピーした後に自分がお部屋に入る処理
+window.goToRoomActual = function() {
+    if (nextJumpUrl) {
+        window.location.href = nextJumpUrl;
+    }
+}
+
+// ==========================================================================
+// 🔗 Firebaseデータベースへの接続設定（部屋情報があるときだけ動くようにするよ）
+// ==========================================================================
+let myRef, roomRef;
+if (roomId && myId) {
+    myRef = ref(database, `rooms/${roomId}/users/${myId}`);
+    roomRef = ref(database, `rooms/${roomId}/users`);
+}
 
 let uploadLimit = 3;
 
@@ -44,7 +107,8 @@ let uploadLimit = 3;
 // ==========================================================================
 
 // 自分のデータをFirebaseに送信（保存）する共通関数
-function saveDataToServer(messageText, effectEmoji) {
+window.saveDataToServer = function(messageText, effectEmoji) {
+    if (!myRef) return;
     const currentAvatarSrc = document.getElementById('my-avatar-preview').src;
     
     const statusElement = document.getElementById('my-current-status');
@@ -64,8 +128,12 @@ function saveDataToServer(messageText, effectEmoji) {
     });
 }
 
-// エフェクトを画面に出す関数
-function triggerEffect(emojis) {
+// ==========================================================================
+// 🛠️ 共通で使う大事な関数（確実に外から見えるように修正したよ！）
+// ==========================================================================
+
+// ✨ エフェクトを画面に出す魔法の関数（windowを頭につけました！）
+window.triggerEffect = function(emojis) {
     const effectLayer = document.getElementById('effect-layer');
     if (!effectLayer) return;
     
@@ -76,57 +144,89 @@ function triggerEffect(emojis) {
     setTimeout(() => { effectDiv.remove(); }, 2000);
 }
 
-// ポップアップ開閉
-window.openAvatarModal = function() { document.getElementById('avatar-modal').style.display = 'flex'; }
-window.closeAvatarModal = function() { document.getElementById('avatar-modal').style.display = 'none'; }
+// 自分のデータをFirebaseに送信（保存）する共通関数
+window.saveDataToServer = function(messageText, effectEmoji) {
+    if (!myRef) return;
+    const currentAvatarSrc = document.getElementById('my-avatar-preview').src;
+    
+    const statusElement = document.getElementById('my-current-status');
+    if (statusElement) {
+        statusElement.innerText = messageText;
+    }
+    
+    set(myRef, {
+        avatar: currentAvatarSrc,
+        message: messageText,
+        effect: effectEmoji || "",
+        checked: false
+    }).then(() => {
+        console.log("Firebaseへの送信に成功！:", messageText);
+    }).catch((error) => {
+        console.error("Firebaseへの送信でエラー:", error);
+    });
+}
 
+// ポップアップ開閉（開く瞬間にカスタム写真を強制リロードする魔法を追加！）
+window.openAvatarModal = function() { 
+    // 💡 ポップアップを開く前に、過去にカスタムした写真をLocalStorageから確実に読み込む！
+    if (typeof window.loadCustomAvatars === "function") {
+        window.loadCustomAvatars();
+    }
+    
+    // ポップアップを表示する
+    document.getElementById('avatar-modal').style.display = 'flex'; 
+}
+
+window.closeAvatarModal = function() { 
+    document.getElementById('avatar-modal').style.display = 'none'; 
+}
 // ==========================================================================
-// 📡 【進化版】部屋にいる「自分以外の人（相手）」を自動で見つけて画面に映す
+// 📡 部屋にいる「自分以外の人（相手）」を自動で見つけて画面に映す
 // ==========================================================================
-onValue(roomRef, (snapshot) => {
-    const allUsersData = snapshot.val();
-    if (allUsersData) {
-        // 部屋にいる全員の名前リストを取り出して、自分以外の人の名前（partnerId）を探す
-        const userNames = Object.keys(allUsersData);
-        const partnerId = userNames.find(name => name !== myId);
-        
-        // もし自分以外の相手が見つかったら、その人のデータを画面の上半分に映す！
-        if (partnerId) {
-            const partnerData = allUsersData[partnerId];
+if (roomRef) {
+    onValue(roomRef, (snapshot) => {
+        const allUsersData = snapshot.val();
+        if (allUsersData) {
+            const userNames = Object.keys(allUsersData);
+            const partnerId = userNames.find(name => name !== myId);
             
-            // 相手の名前を画面に表示（〇〇のいま を書き換える）
-            document.querySelector('#partner-area h2').innerText = `${partnerId} のいま`;
-            
-            if (partnerData.avatar) {
-                document.getElementById('partner-avatar').src = partnerData.avatar;
-            }
-            if (partnerData.message) {
-                document.getElementById('partner-message').innerText = partnerData.message;
-            }
-            if (partnerData.effect && partnerData.checked === false) {
-                triggerEffect(partnerData.effect);
-                // 相手が送ってきたエフェクトを「既読（true）」にする
-                set(ref(database, `rooms/${roomId}/users/${partnerId}/checked`), true);
+            if (partnerId) {
+                const partnerData = allUsersData[partnerId];
+                
+                const partnerTitle = document.querySelector('#partner-area h2');
+                if (partnerTitle) partnerTitle.innerText = `${partnerId} のいま`;
+                
+                if (partnerData.avatar) {
+                    document.getElementById('partner-avatar').src = partnerData.avatar;
+                }
+                if (partnerData.message) {
+                    document.getElementById('partner-message').innerText = partnerData.message;
+                }
+                if (partnerData.effect && partnerData.checked === false) {
+                    window.triggerEffect(partnerData.effect);
+                    set(ref(database, `rooms/${roomId}/users/${partnerId}/checked`), true);
+                }
             }
         }
-    }
-});
+    });
+}
 
 // ==========================================================================
-// 3. 状態ボタンを押した時の処理（スペース問題の修正版！）
+// 3. 状態ボタンを押した時の処理
 // ==========================================================================
 window.changeStatus = function(statusText) {
     let effect = "";
-    if (statusText.includes('まったり')) effect = '☕️🍀🏠';
-    else if (statusText.includes('勉強')) effect = '🔥💪😤';      // 「勉強がんばる」から「勉強」に省略して確実に！
+     if (statusText.includes('まったり')) effect = '☕️🍀🏠';
+    else if (statusText.includes('勉強')) effect = '🔥💪😤';      
     else if (statusText.includes('パソコン')) effect = '💻👀⚡️';
     else if (statusText.includes('おやつ')) effect = '🍰🍩🧋';
     else if (statusText.includes('寝るね')) effect = '🌙💤⭐️';
-    else if (statusText.includes('また明日')) effect = '❤️❤️❤️';    // HTML側のスペース付きでも引っかかるように調整
-    else if (statusText.includes('夜更かし草')) effect = '💖✨💘';  // HTML側のスペース付きでも引っかかるように調整
-    
-    triggerEffect(effect);
-    saveDataToServer(statusText, effect);
+    else if (statusText.includes('また明日')) effect = '❤️❤️❤️';    
+    else if (statusText.includes('夜更かし草')) effect = '💖✨💘';  
+
+    // 👇 頭に window. を付け足して、確実に魔法を呼び出すよ！
+    window.triggerEffect(effect);
+    window.saveDataToServer(statusText, effect);
 }
 // ==========================================================================
 // 4. 自由入力のメッセージ送信
@@ -137,123 +237,69 @@ window.sendStatus = function() {
         alert("メッセージを入力してね！");
         return;
     }
-    document.getElementById('my-current-status').innerText = messageInput.value;
-    triggerEffect('✨🎉✨');
-    saveDataToServer(messageInput.value, '✨🎉✨');
+    const statusText = messageInput.value;
+    document.getElementById('my-current-status').innerText = statusText;
+    
+    // 👇 ここも頭に window. を付け足すよ！
+    window.triggerEffect('✨🎉✨');
+    window.saveDataToServer(statusText, '✨🎉✨');
     messageInput.value = "";
 }
-
 // ==========================================================================
 // 5. アバター変更（プリセット）
 // ==========================================================================
-window.selectPresetAvatar = function(avatarName) {
-    if (!checkUploadLimit()) return;
-    document.getElementById('my-avatar-preview').src = `image/${avatarName}.png`;
-    
-    const currentMsg = "アバターを変えたよ";
-    saveDataToServer(currentMsg, "");
-    
-    reduceUploadCount();
-    closeAvatarModal();
-}
-
-// ==========================================================================
-// 6. アバター変更（写真アップロード）
-// ==========================================================================
-window.uploadMyAvatarPhoto = function() {
-    if (!checkUploadLimit()) return;
-    const fileInput = document.getElementById('avatar-file-input');
-    if (fileInput.files && fileInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById('my-avatar-preview').src = e.target.result;
-            saveDataToServer("新しい写真アバターにしたよ！", "📸");
-            reduceUploadCount();
-            closeAvatarModal();
-        };
-        reader.readAsDataURL(fileInput.files[0]);
-    }
-}
-
+// アップロード制限の簡易チェック（関数が他にない場合のエラー防止用）
 function checkUploadLimit() {
-    if (uploadLimit <= 0) {
-        alert("今日のアバター変更枠（3回）を使い切ったよ！");
-        closeAvatarModal();
-        return false;
-    }
-    return true;
+    return uploadLimit > 0;
 }
-
 function reduceUploadCount() {
     uploadLimit--;
-    document.getElementById('upload-count').innerText = uploadLimit;
+    const countEl = document.getElementById('upload-count');
+    if (countEl) countEl.innerText = uploadLimit;
 }
 
-// ==========================================================================
-// 7. 背景写真アップロード
-// ==========================================================================
-window.uploadBackground = function() {
-    const photoInput = document.getElementById('bg-photo-input');
-    const appContainer = document.getElementById('app-container');
-    if (photoInput.files && photoInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            appContainer.style.backgroundImage = `url('${e.target.result}')`;
-            appContainer.style.backgroundSize = 'cover';
-            appContainer.style.backgroundPosition = 'center';
-            alert("背景画像を設定したよ！");
-        };
-        reader.readAsDataURL(photoInput.files[0]);
+// ✨ アバターを選んだときの処理（エラー修正版！）
+window.selectPresetAvatar = function(presetId, customSrc) {
+    // もしカスタムされた画像URL（Base64など）があればそれを使い、なければ元の画像パスを使う
+    const finalAvatarSrc = customSrc || `image/${presetId}.png`;
+    
+    // 自分のプレビュー画像を書き換える
+    const myPreview = document.getElementById('my-avatar-preview');
+    if (myPreview) {
+        myPreview.src = finalAvatarSrc;
+    }
+    
+    // サーバー（Firebase）に保存する
+    const currentMsg = "アバターを変えたよ";
+    
+    // 💡 ここがポイント！元の「saveDataToServer」の形に合わせて、window. を外して呼び出すよ
+    if (typeof saveDataToServer === "function") {
+        saveDataToServer(currentMsg, "");
+    } else if (typeof window.saveDataToServer === "function") {
+        window.saveDataToServer(currentMsg, "");
     }
 }
-
 // ==========================================================================
-// 📡 【新機能】ページを開いた時に、自分の最新データをFirebaseから読み込んで復活させる
+// 🔍 写真をタップした時に大きく拡大する魔法
 // ==========================================================================
-onValue(myRef, (snapshot) => {
-    const myData = snapshot.val();
-    if (myData) {
-        // 1. 保存されていたメッセージを復活
-        if (myData.message) {
-            const statusElement = document.getElementById('my-current-status');
-            if (statusElement) {
-                statusElement.innerText = myData.message;
-            }
-        }
-        // 2. 保存されていたアバター画像を復活
-        if (myData.avatar) {
-            const avatarElement = document.getElementById('my-avatar-preview');
-            if (avatarElement) {
-                avatarElement.src = myData.avatar;
-            }
-        }
-    }
-});
-
-// ==========================================================================
-// 🔍 【新機能】写真をタップした時に大きく拡大する魔法
-// ==========================================================================
-
-// 写真を拡大して表示する関数
 window.zoomPhoto = function(element) {
     const modal = document.getElementById('photo-zoom-modal');
     const zoomedImg = document.getElementById('zoomed-photo');
     if (modal && zoomedImg) {
-        zoomedImg.src = element.src; // タップされた画像のURLをコピー
-        modal.style.display = 'flex'; // 拡大画面を表示！
+        zoomedImg.src = element.src;
+        modal.style.display = 'flex';
     }
 }
 
-// 拡大画面を閉じる関数
 window.closeZoomModal = function() {
     const modal = document.getElementById('photo-zoom-modal');
     if (modal) {
-        modal.style.display = 'none'; // 拡大画面を非表示に！
+        modal.style.display = 'none';
     }
 }
 
 // ==========================================================================
-// 📸 【新機能】インスタ風画面切り替え（タブ機能）の魔法
+// 📸 インスタ風画面切り替え（タブ機能）の魔法
 // ==========================================================================
 window.switchTab = function(tabName) {
     const myArea = document.getElementById('my-area');
@@ -262,25 +308,27 @@ window.switchTab = function(tabName) {
     const tabPartnerBtn = document.getElementById('tab-partner');
 
     if (tabName === 'my') {
-        // 「じぶん」を表示、相手を隠す
-        myArea.style.display = 'block';
-        partnerArea.style.display = 'none';
-        
-        // ボタンの色をアクティブ（緑）にする
-        tabMyBtn.style.color = '#4caf50';
-        tabMyBtn.style.borderBottom = '3px solid #4caf50';
-        tabPartnerBtn.style.color = '#888';
-        tabPartnerBtn.style.borderBottom = '3px solid transparent';
+        if (myArea) myArea.style.display = 'block';
+        if (partnerArea) partnerArea.style.display = 'none';
+        if (tabMyBtn) {
+            tabMyBtn.style.color = '#4caf50';
+            tabMyBtn.style.borderBottom = '3px solid #4caf50';
+        }
+        if (tabPartnerBtn) {
+            tabPartnerBtn.style.color = '#888';
+            tabPartnerBtn.style.borderBottom = '3px solid transparent';
+        }
     } else {
-        // 「あいて」を表示、自分を隠す
-        myArea.style.display = 'none';
-        partnerArea.style.display = 'block';
-        
-        // ボタンの色をアクティブ（緑）にする
-        tabPartnerBtn.style.color = '#4caf50';
-        tabPartnerBtn.style.borderBottom = '3px solid #4caf50';
-        tabMyBtn.style.color = '#888';
-        tabMyBtn.style.borderBottom = '3px solid transparent';
+        if (myArea) myArea.style.display = 'none';
+        if (partnerArea) partnerArea.style.display = 'block';
+        if (tabPartnerBtn) {
+            tabPartnerBtn.style.color = '#4caf50';
+            tabPartnerBtn.style.borderBottom = '3px solid #4caf50';
+        }
+        if (tabMyBtn) {
+            tabMyBtn.style.color = '#888';
+            tabMyBtn.style.borderBottom = '3px solid transparent';
+        }
     }
 }
 
@@ -289,4 +337,164 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof window.switchTab === 'function') {
         window.switchTab('partner');
     }
+});
+
+// ==========================================================================
+// 📸 【復活！】自分の写真を読み込んでセットする魔法
+// ==========================================================================
+window.uploadOwnPhoto = function(input) {
+    if (!checkUploadLimit()) {
+        alert("本日の変更回数の上限です");
+        return;
+    }
+
+    // 写真がちゃんと選ばれているかチェック
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+
+        // 写真の読み込みが完了した時の処理
+        reader.onload = function(e) {
+            // 自分のアバタープレビューを、選んだ写真に書き換える
+            document.getElementById('my-avatar-preview').src = e.target.result;
+
+            // Firebaseのサーバーにも、この写真のデータを送信する
+            const currentMsg = "新しい写真を設定したよ！📸";
+            window.saveDataToServer(currentMsg, "");
+
+            // 制限回数を減らしてモーダルを閉じる
+            reduceUploadCount();
+            window.closeAvatarModal();
+        };
+
+        // 写真をデータとして読み込む
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// ==========================================================================
+// 💡 【ログイン版用】アバターの6枚枠をカスタムする魔法
+// ==========================================================================
+window.isEditMode = false;
+window.currentEditingIndex = -1;
+
+// 1. カスタムモードのON/OFFを切り替える魔法
+window.toggleCustomMode = function() {
+    window.isEditMode = !window.isEditMode;
+    const grid = document.getElementById('preset-avatar-grid');
+    const button = document.getElementById('toggle-custom-mode');
+    
+    if (window.isEditMode) {
+        if(grid) grid.classList.add('edit-mode');
+        if(button) {
+            button.innerText = "アバターを選ぶモードに戻る";
+            button.style.backgroundColor = "#ff9800"; // オレンジ色
+            button.style.boxShadow = "0 3px 0 #e68a00";
+        }
+    } else {
+        if(grid) grid.classList.remove('edit-mode');
+        if(button) {
+            button.innerText = "⚙️ 6つの枠の写真をカスタムする";
+            button.style.backgroundColor = "#888"; // グレー
+            button.style.boxShadow = "0 3px 0 #666";
+        }
+    }
+}
+
+// 2. 6つのアバター枠がクリックされたときの魔法（カウント連動＆自動で閉じる完全版！）
+window.handleAvatarClick = function(index, presetId) {
+    if (window.isEditMode) {
+        // 【カスタムモード】ならファイル選択を開く
+        window.currentEditingIndex = index;
+        const fileInput = document.getElementById('avatar-file-input');
+        if (fileInput) fileInput.click(); 
+    } else {
+        // 【通常モード】（アバターを決定するとき）
+        
+        // 1. 変更回数の上限に達していないかチェックする
+        if (typeof checkUploadLimit === "function" && !checkUploadLimit()) {
+            alert("本日の変更回数の上限（3回）に達したため、変更できません。");
+            return; // 上限ならここでストップ
+        }
+        
+        // 2. アバターを確定してFirebaseへ送信
+        const img = document.getElementById(`preset-img-${index}`);
+        const customSrc = img ? img.src : null;
+        window.selectPresetAvatar(presetId, customSrc);
+        
+        // 3. 本日の残り回数を1回分減らす
+        if (typeof reduceUploadCount === "function") {
+            reduceUploadCount();
+        }
+
+        // ✨【ここが超重要！】アバター変更とカウントが全部終わったら、自動でパッと閉じる！
+        if (typeof window.closeAvatarModal === "function") {
+            window.closeAvatarModal();
+        } else if (typeof closeAvatarModal === "function") {
+            closeAvatarModal();
+        }
+    }
+}
+
+// 3. 自分の写真をアップロードしたときの処理
+window.uploadOwnPhoto = function(input) {
+    if (typeof checkUploadLimit === "function" && !checkUploadLimit()) {
+        alert("本日の変更回数の上限です");
+        return;
+    }
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const newPhotoData = e.target.result;
+
+            if (window.isEditMode && window.currentEditingIndex !== -1) {
+                // 枠のカスタム処理
+                const presetImg = document.getElementById(`preset-img-${window.currentEditingIndex}`);
+                if (presetImg) presetImg.src = newPhotoData;
+                
+                // ブラウザに保存
+                localStorage.setItem(`customAvatar_${window.currentEditingIndex}`, newPhotoData);
+                alert(`${window.currentEditingIndex}番目の枠をカスタムしました！`);
+                
+                window.toggleCustomMode(); // 通常モードに戻す
+                window.currentEditingIndex = -1;
+            } else {
+                // 自分の写真を直接アイコンにする通常処理
+                const myPreview = document.getElementById('my-avatar-preview');
+                if (myPreview) myPreview.src = newPhotoData;
+                
+                const currentMsg = "新しい写真を設定したよ！📸";
+                if (typeof saveDataToServer === "function") {
+                    saveDataToServer(currentMsg, "");
+                } else if (typeof window.saveDataToServer === "function") {
+                    window.saveDataToServer(currentMsg, "");
+                }
+                
+                if (typeof reduceUploadCount === "function") reduceUploadCount();
+                window.closeAvatarModal();
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// 4. アプリ起動時に過去にカスタムした画像を自動で読み込む魔法
+window.loadCustomAvatars = function() {
+    for (let i = 1; i <= 6; i++) {
+        const savedData = localStorage.getItem(`customAvatar_${i}`);
+        if (savedData) {
+            const presetImg = document.getElementById(`preset-img-${i}`);
+            if (presetImg) {
+                presetImg.src = savedData;
+            }
+        }
+    }
+}
+
+// 画面が完全に読み込まれたら自動で過去のカスタムを反映する
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        if (typeof window.loadCustomAvatars === "function") {
+            window.loadCustomAvatars();
+        }
+    }, 500);
 });
