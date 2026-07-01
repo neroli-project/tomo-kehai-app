@@ -243,38 +243,39 @@ window.sendStatus = function() {
     window.saveDataToServer(statusText, '✨🎉✨');
     messageInput.value = "";
 }
-// ==========================================================================
-// 5. アバター変更（プリセット）
-// ==========================================================================
-// アップロード制限の簡易チェック（関数が他にない場合のエラー防止用）
-function checkUploadLimit() {
-    return uploadLimit > 0;
-}
-function reduceUploadCount() {
-    uploadLimit--;
-    const countEl = document.getElementById('upload-count');
-    if (countEl) countEl.innerText = uploadLimit;
-}
-
-// ✨ アバターを選んだときの処理（エラー修正版！）
+// ✨ アバターを選んだときの処理（スマホでのリセット完全ガード版！）
 window.selectPresetAvatar = function(presetId, customSrc) {
-    // もしカスタムされた画像URL（Base64など）があればそれを使い、なければ元の画像パスを使う
+    // もしカスタムされた画像URLがあればそれを使い、なければ元の画像パスを使う
     const finalAvatarSrc = customSrc || `image/${presetId}.png`;
     
-    // 自分のプレビュー画像を書き換える
+    // 1. 自分のプレビュー画像を書き換える
     const myPreview = document.getElementById('my-avatar-preview');
     if (myPreview) {
         myPreview.src = finalAvatarSrc;
     }
     
-    // サーバー（Firebase）に保存する
+    // 2. サーバー（Firebase）に直接「新しい画像」を指定して確実に保存する！
     const currentMsg = "アバターを変えたよ";
     
-    // 💡 ここがポイント！元の「saveDataToServer」の形に合わせて、window. を外して呼び出すよ
-    if (typeof saveDataToServer === "function") {
-        saveDataToServer(currentMsg, "");
-    } else if (typeof window.saveDataToServer === "function") {
-        window.saveDataToServer(currentMsg, "");
+    if (typeof myRef !== "undefined" && myRef && typeof set === "function") {
+        // 💡 時差をなくすために、画面のプレビューを待たずに「決定した画像URL」を直接Firebaseに送りつけるよ！
+        set(myRef, {
+            avatar: finalAvatarSrc, // 新しい画像を確実に指定！
+            message: currentMsg,
+            effect: "",
+            checked: false
+        }).then(() => {
+            console.log("アバターのFirebase保存に成功！:", finalAvatarSrc);
+        }).catch((error) => {
+            console.error("アバターのFirebase保存エラー:", error);
+        });
+    } else {
+        // バックアップ用（もし上の直接保存が動かない場合は元の関数を呼ぶ）
+        if (typeof saveDataToServer === "function") {
+            saveDataToServer(currentMsg, "");
+        } else if (typeof window.saveDataToServer === "function") {
+            window.saveDataToServer(currentMsg, "");
+        }
     }
 }
 // ==========================================================================
