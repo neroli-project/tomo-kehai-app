@@ -179,12 +179,15 @@ window.closeAvatarModal = function() {
     document.getElementById('avatar-modal').style.display = 'none'; 
 }
 // ==========================================================================
-// 📡 部屋にいる「自分以外の人（相手）」を自動で見つけて画面に映す
+// 📡 部屋にいる「自分以外の人（相手）」＆「自分自身」のデータを自動で画面に映す
 // ==========================================================================
 if (roomRef) {
     onValue(roomRef, (snapshot) => {
         const allUsersData = snapshot.val();
         if (allUsersData) {
+            // --------------------------------------------------
+            // 👥 ① 相手のデータを画面に映す魔法
+            // --------------------------------------------------
             const userNames = Object.keys(allUsersData);
             const partnerId = userNames.find(name => name !== myId);
             
@@ -202,13 +205,37 @@ if (roomRef) {
                 }
                 if (partnerData.effect && partnerData.checked === false) {
                     window.triggerEffect(partnerData.effect);
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const roomId = urlParams.get('room') || 'default_room';
                     set(ref(database, `rooms/${roomId}/users/${partnerId}/checked`), true);
+                }
+            }
+
+            // --------------------------------------------------
+            // 🙋‍♀️ ② 自分のデータを画面に映す魔法（更新時のリセットを完全ガード！）
+            // --------------------------------------------------
+            if (myId && allUsersData[myId]) {
+                const myData = allUsersData[myId];
+                
+                // Firebaseに保存されている自分のアバターを、開いた瞬間に強制的にプレビューに映す！
+                if (myData.avatar) {
+                    const myPreview = document.getElementById('my-avatar-preview');
+                    if (myPreview) {
+                        myPreview.src = myData.avatar;
+                    }
+                }
+                
+                // ついでに自分のメッセージもリセットされないように守るよ！
+                if (myData.message) {
+                    const myStatus = document.getElementById('my-current-status');
+                    if (myStatus) {
+                        myStatus.innerText = myData.message;
+                    }
                 }
             }
         }
     });
 }
-
 // ==========================================================================
 // 3. 状態ボタンを押した時の処理
 // ==========================================================================
