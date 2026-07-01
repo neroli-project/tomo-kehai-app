@@ -370,7 +370,7 @@ window.uploadOwnPhoto = function(input) {
 }
 
 // ==========================================================================
-// 💡 【ログイン版・無敵化】アバターの6枚枠をカスタムする魔法（ログイン変数対応版！）
+// 💡 【ログイン版・無敵化】アバターの6枚枠をカスタムする魔法（10.8.0 最終決定版！）
 // ==========================================================================
 window.isEditMode = false;
 window.currentEditingIndex = -1;
@@ -452,6 +452,7 @@ function compressImage(file, maxWidth, maxHeight, callback) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
             
+            // 画質を0.7（70%）までギュッと圧縮して文字データにする
             const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
             callback(compressedDataUrl);
         };
@@ -460,7 +461,7 @@ function compressImage(file, maxWidth, maxHeight, callback) {
     reader.readAsDataURL(file);
 }
 
-// 3. 自分の写真をアップロードしたときの処理（データベース無敵保存版！）
+// 3. 自分の写真をアップロードしたときの処理（データベース完全同期版！）
 window.uploadOwnPhoto = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
@@ -469,26 +470,29 @@ window.uploadOwnPhoto = function(input) {
             
             if (window.isEditMode && window.currentEditingIndex !== -1) {
                 const index = window.currentEditingIndex;
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomName = urlParams.get('room') || 'default_room';
                 
-                // 💡 既存の roomRef と、Firebaseの新しい関数（set, child）を組み合わせる書き方に修正
-                if (typeof roomRef !== "undefined" && roomRef) {
-                    // もし新しいFirebase（v9+）のセット関数が使える場合
-                    if (typeof set === "function" && typeof child === "function") {
-                        const customAvatarRef = child(roomRef, `custom_avatars/custom_${index}`);
-                        set(customAvatarRef, compressedDataUrl).then(() => {
-                            alert(`${index}番目の枠をデータベースに完全保存しました！絶対に消えません！`);
-                            window.toggleCustomMode();
-                            window.currentEditingIndex = -1;
-                        }).catch((error) => { console.error("保存エラー:", error); });
-                    } 
-                    // もし古い形式のパス指定が残っている場合
-                    else if (typeof roomRef.child === "function") {
-                        roomRef.child(`custom_avatars/custom_${index}`).set(compressedDataUrl).then(() => {
-                            alert(`${index}番目の枠をデータベースに完全保存しました！絶対に消えません！`);
-                            window.toggleCustomMode();
-                            window.currentEditingIndex = -1;
-                        });
-                    }
+                // 💡 Firebase 10.8.0 の標準的なパス指定方法（rooms/部屋名/custom_avatars/custom_番号）
+                if (typeof database !== "undefined" && database) {
+                    const customAvatarRef = ref(database, `rooms/${roomName}/custom_avatars/custom_${index}`);
+                    
+                    set(customAvatarRef, compressedDataUrl).then(() => {
+                        alert(`${index}番目の枠をデータベースに完全保存しました！絶対に消えません！`);
+                        window.toggleCustomMode();
+                        window.currentEditingIndex = -1;
+                    }).catch((error) => {
+                        console.error("保存エラー:", error);
+                        alert("データベースへの保存でエラーが発生しました。");
+                    });
+                } else if (typeof roomRef !== "undefined" && roomRef) {
+                    // バックアップ：roomRefが使える場合
+                    const customAvatarRef = child(roomRef, `custom_avatars/custom_${index}`);
+                    set(customAvatarRef, compressedDataUrl).then(() => {
+                        alert(`${index}番目の枠を保存しました！`);
+                        window.toggleCustomMode();
+                        window.currentEditingIndex = -1;
+                    });
                 } else {
                     localStorage.setItem(`customAvatar_${index}`, compressedDataUrl);
                     alert(`${index}番目の枠をスマホに保存しました！`);
@@ -518,12 +522,17 @@ window.uploadOwnPhoto = function(input) {
     }
 }
 
-// 4. データベースからカスタム画像を自動でリアルタイムに読み込む魔法
+// 4. データベースからカスタム画像を自動でリアルタイムに読み込む魔法（10.8.0 完全対応版）
 window.loadCustomAvatars = function() {
-    // 💡 既存の roomRef と、Firebaseの新しい関数（onValue, child）を組み合わせる書き方に修正
-    if (typeof roomRef !== "undefined" && roomRef) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomName = urlParams.get('room') || 'default_room';
+    
+    if (typeof database !== "undefined" && database) {
+        const customAvatarsRef = ref(database, `rooms/${roomName}/custom_avatars`);
         
-        const updateGridImages = (data) => {
+        // リアルタイムにデータベースを見張って、画像データを枠に流し込む
+        onValue(customAvatarsRef, (snapshot) => {
+            const data = snapshot.val();
             if (data) {
                 for (let i = 1; i <= 6; i++) {
                     if (data[`custom_${i}`]) {
@@ -534,21 +543,21 @@ window.loadCustomAvatars = function() {
                     }
                 }
             }
-        };
-
-        // 新しいFirebase（v9+）のonValueがある場合
-        if (typeof onValue === "function" && typeof child === "function") {
-            const customAvatarsRef = child(roomRef, 'custom_avatars');
-            onValue(customAvatarsRef, (snapshot) => {
-                updateGridImages(snapshot.val());
-            });
-        } 
-        // 古い形式の .on('value') が残っている場合
-        else if (typeof roomRef.child === "function") {
-            roomRef.child('custom_avatars').on('value', (snapshot) => {
-                updateGridImages(snapshot.val());
-            });
-        }
+        });
+    } else if (typeof roomRef !== "undefined" && roomRef) {
+        // バックアップ：roomRefから監視する場合
+        const customAvatarsRef = child(roomRef, 'custom_avatars');
+        onValue(customAvatarsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                for (let i = 1; i <= 6; i++) {
+                    if (data[`custom_${i}`]) {
+                        const presetImg = document.getElementById(`preset-img-${i}`);
+                        if (presetImg) { presetImg.src = data[`custom_${i}`]; }
+                    }
+                }
+            }
+        });
     }
 }
 
