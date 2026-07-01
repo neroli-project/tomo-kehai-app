@@ -478,7 +478,7 @@ window.uploadOwnPhoto = function(input) {
                     const customAvatarRef = ref(database, `rooms/${roomName}/custom_avatars/custom_${index}`);
                     
                     set(customAvatarRef, compressedDataUrl).then(() => {
-                        alert(`${index}番目の枠をデータベースに完全保存しました！絶対に消えません！`);
+                        alert(`${index}番目の枠を保存しました！`);
                         window.toggleCustomMode();
                         window.currentEditingIndex = -1;
                     }).catch((error) => {
