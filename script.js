@@ -372,7 +372,7 @@ window.uploadOwnPhoto = function(input) {
 }
 
 // ==========================================================================
-// 💡 【ログイン版・無敵化】アバターの6枚枠をカスタムする魔法（データベース保存版！）
+// 💡 【ログイン版・無敵化】アバターの6枚枠をカスタムする魔法（ログイン変数対応版！）
 // ==========================================================================
 window.isEditMode = false;
 window.currentEditingIndex = -1;
@@ -454,7 +454,6 @@ function compressImage(file, maxWidth, maxHeight, callback) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
             
-            // 画質を0.7（70%）までギュッと圧縮して文字データにする
             const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
             callback(compressedDataUrl);
         };
@@ -468,26 +467,31 @@ window.uploadOwnPhoto = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
         
-        // 💡 横縦最大150pxに圧縮して、データベースがパンクしない超軽量データにする！
         compressImage(file, 150, 150, function(compressedDataUrl) {
             
             if (window.isEditMode && window.currentEditingIndex !== -1) {
-                // 【カスタムモード】データベースの部屋データの中に直接書き込む！
                 const index = window.currentEditingIndex;
                 
-                // お部屋の共有データエリアにカスタム画像を保存する魔法
+                // 💡 既存の roomRef と、Firebaseの新しい関数（set, child）を組み合わせる書き方に修正
                 if (typeof roomRef !== "undefined" && roomRef) {
-                    const customAvatarRef = firebase.database().ref(roomRef.path.toString() + `/custom_avatars/custom_${index}`);
-                    
-                    customAvatarRef.set(compressedDataUrl).then(() => {
-                        alert(`${index}番目の枠をデータベースに完全保存しました！iPhoneでも絶対に消えません！`);
-                        window.toggleCustomMode();
-                        window.currentEditingIndex = -1;
-                    }).catch((error) => {
-                        console.error("保存エラー:", error);
-                    });
+                    // もし新しいFirebase（v9+）のセット関数が使える場合
+                    if (typeof set === "function" && typeof child === "function") {
+                        const customAvatarRef = child(roomRef, `custom_avatars/custom_${index}`);
+                        set(customAvatarRef, compressedDataUrl).then(() => {
+                            alert(`${index}番目の枠をデータベースに完全保存しました！絶対に消えません！`);
+                            window.toggleCustomMode();
+                            window.currentEditingIndex = -1;
+                        }).catch((error) => { console.error("保存エラー:", error); });
+                    } 
+                    // もし古い形式のパス指定が残っている場合
+                    else if (typeof roomRef.child === "function") {
+                        roomRef.child(`custom_avatars/custom_${index}`).set(compressedDataUrl).then(() => {
+                            alert(`${index}番目の枠をデータベースに完全保存しました！絶対に消えません！`);
+                            window.toggleCustomMode();
+                            window.currentEditingIndex = -1;
+                        });
+                    }
                 } else {
-                    // ルーム参照がない場合のバックアップ（LocalStorage）
                     localStorage.setItem(`customAvatar_${index}`, compressedDataUrl);
                     alert(`${index}番目の枠をスマホに保存しました！`);
                     window.toggleCustomMode();
@@ -518,12 +522,10 @@ window.uploadOwnPhoto = function(input) {
 
 // 4. データベースからカスタム画像を自動でリアルタイムに読み込む魔法
 window.loadCustomAvatars = function() {
+    // 💡 既存の roomRef と、Firebaseの新しい関数（onValue, child）を組み合わせる書き方に修正
     if (typeof roomRef !== "undefined" && roomRef) {
-        const customAvatarsRef = firebase.database().ref(roomRef.path.toString() + '/custom_avatars');
         
-        // データベースをずっと見張って、画像が変わったら自動で枠を書き換える
-        customAvatarsRef.on('value', (snapshot) => {
-            const data = snapshot.val();
+        const updateGridImages = (data) => {
             if (data) {
                 for (let i = 1; i <= 6; i++) {
                     if (data[`custom_${i}`]) {
@@ -534,7 +536,21 @@ window.loadCustomAvatars = function() {
                     }
                 }
             }
-        });
+        };
+
+        // 新しいFirebase（v9+）のonValueがある場合
+        if (typeof onValue === "function" && typeof child === "function") {
+            const customAvatarsRef = child(roomRef, 'custom_avatars');
+            onValue(customAvatarsRef, (snapshot) => {
+                updateGridImages(snapshot.val());
+            });
+        } 
+        // 古い形式の .on('value') が残っている場合
+        else if (typeof roomRef.child === "function") {
+            roomRef.child('custom_avatars').on('value', (snapshot) => {
+                updateGridImages(snapshot.val());
+            });
+        }
     }
 }
 
