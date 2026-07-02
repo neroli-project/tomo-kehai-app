@@ -597,3 +597,97 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }, 1000);
 });
+
+// ==========================================================================
+// 💎 【新機能】ステータスボタンの文字をカスタム＆データベース保存する魔法
+// ==========================================================================
+window.isTextEditMode = false;
+
+// 1. 文字カスタムモードのON/OFFを切り替える魔法
+window.toggleTextCustomMode = function() {
+    window.isTextEditMode = !window.isTextEditMode;
+    const button = document.getElementById('toggle-text-custom-mode');
+    
+    if (window.isTextEditMode) {
+        if(button) {
+            button.innerText = "文字を選ぶモードに戻る";
+            button.style.backgroundColor = "#9c27b0"; // プレミアム感のある紫
+            button.style.boxShadow = "0 3px 0 #7b1fa2";
+        }
+        alert("文字のカスタムモードになりました！変更したいボタンをポチッと押してね。");
+    } else {
+        if(button) {
+            button.innerText = "⚙️ 6つの文字をカスタムする";
+            button.style.backgroundColor = "#888"; // グレー
+            button.style.boxShadow = "0 3px 0 #666";
+        }
+    }
+}
+
+// 2. ステータスボタンがクリックされたときの魔法
+window.handleTextClick = function(index, defaultText) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomName = urlParams.get('room') || 'default_room';
+
+    if (window.isTextEditMode) {
+        // 【カスタムモード】なら、文字を入力させるポップアップを出す
+        const currentBtn = document.getElementById(`status-btn-${index}`);
+        const currentText = currentBtn ? currentBtn.innerText : defaultText;
+        
+        const newText = prompt(`【${index + 1}番目のボタン】新しい文字を入力してね：`, currentText);
+        
+        if (newText !== null && newText.trim() !== "") {
+            // Firebaseデータベースの「custom_texts」の中に保存する
+            if (typeof database !== "undefined" && database) {
+                const textRef = ref(database, `rooms/${roomName}/custom_texts/text_${index}`);
+                set(textRef, newText).then(() => {
+                    alert(`ボタンの文字を「${newText}」に完全保存しました！`);
+                    window.toggleTextCustomMode(); // 通常モードに戻す
+                }).catch((error) => {
+                    console.error("文字保存エラー:", error);
+                });
+            }
+        }
+    } else {
+        // 【通常モード】なら、そのボタンの文字を自分のステータスとして送信する
+        const currentBtn = document.getElementById(`status-btn-${index}`);
+        const selectedText = currentBtn ? currentBtn.innerText : defaultText;
+        
+        if (typeof saveDataToServer === "function") {
+            saveDataToServer(selectedText, ""); // Firebaseに現在の状態を送信
+        }
+    }
+}
+
+// 3. データベースからカスタムされた文字を自動でリアルタイムに読み込む魔法
+window.loadCustomTexts = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomName = urlParams.get('room') || 'default_room';
+    
+    if (typeof database !== "undefined" && database) {
+        const customTextsRef = ref(database, `rooms/${roomName}/custom_texts`);
+        
+        onValue(customTextsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                for (let i = 0; i < 7; i++) {
+                    if (data[`text_${i}`]) {
+                        const btn = document.getElementById(`status-btn-${i}`);
+                        if (btn) {
+                            btn.innerText = data[`text_${i}`];
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+// 画面読み込み時に文字の自動読み込みもお見張りスタート！
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        if (typeof window.loadCustomTexts === "function") {
+            window.loadCustomTexts();
+        }
+    }, 1200); // アバターよりほんの少しだけずらして安全に読み込み
+});
