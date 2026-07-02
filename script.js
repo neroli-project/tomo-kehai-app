@@ -397,64 +397,55 @@ window.uploadOwnPhoto = function(input) {
     }
 }
 
+
+
 // ==========================================================================
-// 💡 【ログイン版・無敵化】アバターの6枚枠をカスタムする魔法（10.8.0 最終決定版！）
+// 💡 【10.8.0対応】アバター枠のカスタム＆文字カスタム 究極合体版魔法！
 // ==========================================================================
+
+// --- ⚙️ アバター用の設定群 ---
 window.isEditMode = false;
 window.currentEditingIndex = -1;
 
-// 1. カスタムモードのON/OFFを切り替える魔法
 window.toggleCustomMode = function() {
     window.isEditMode = !window.isEditMode;
     const grid = document.getElementById('preset-avatar-grid');
     const button = document.getElementById('toggle-custom-mode');
-    
     if (window.isEditMode) {
         if(grid) grid.classList.add('edit-mode');
         if(button) {
             button.innerText = "アバターを選ぶモードに戻る";
-            button.style.backgroundColor = "#ff9800"; // オレンジ色
+            button.style.backgroundColor = "#ff9800";
             button.style.boxShadow = "0 3px 0 #e68a00";
         }
     } else {
         if(grid) grid.classList.remove('edit-mode');
         if(button) {
             button.innerText = "⚙️ 6つの枠の写真をカスタムする";
-            button.style.backgroundColor = "#888"; // グレー
+            button.style.backgroundColor = "#888";
             button.style.boxShadow = "0 3px 0 #666";
         }
     }
-}
+};
 
-// 2. 6つのアバター枠がクリックされたときの魔法
 window.handleAvatarClick = function(index, presetId) {
     if (window.isEditMode) {
-        // 【カスタムモード】ならファイル選択を開く
         window.currentEditingIndex = index;
         const fileInput = document.getElementById('avatar-file-input');
         if (fileInput) fileInput.click(); 
     } else {
-        // 【通常モード】（アバターを決定するとき）
         if (typeof checkUploadLimit === "function" && !checkUploadLimit()) {
             alert("本日の変更回数の上限（3回）に達したため、変更できません。");
             return;
         }
-        
         const img = document.getElementById(`preset-img-${index}`);
         const customSrc = img ? img.src : null;
         window.selectPresetAvatar(presetId, customSrc);
-        
-        if (typeof reduceUploadCount === "function") {
-            reduceUploadCount();
-        }
-
-        if (typeof window.closeAvatarModal === "function") {
-            window.closeAvatarModal();
-        }
+        if (typeof reduceUploadCount === "function") reduceUploadCount();
+        if (typeof window.closeAvatarModal === "function") window.closeAvatarModal();
     }
-}
+};
 
-// ⏳ 写真をきれいに小さく圧縮（リサイズ）して超軽量化する魔法
 function compressImage(file, maxWidth, maxHeight, callback) {
     const reader = new FileReader();
     reader.onload = function(event) {
@@ -463,24 +454,14 @@ function compressImage(file, maxWidth, maxHeight, callback) {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-
             if (width > height) {
-                if (width > maxWidth) {
-                    height *= maxWidth / width;
-                    width = maxWidth;
-                }
+                if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; }
             } else {
-                if (height > maxHeight) {
-                    width *= maxHeight / height;
-                    height = maxHeight;
-                }
+                if (height > maxHeight) { width *= maxHeight / height; height = maxHeight; }
             }
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = width; canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            
-            // 画質を0.7（70%）までギュッと圧縮して文字データにする
             const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
             callback(compressedDataUrl);
         };
@@ -489,205 +470,127 @@ function compressImage(file, maxWidth, maxHeight, callback) {
     reader.readAsDataURL(file);
 }
 
-// 3. 自分の写真をアップロードしたときの処理（データベース完全同期版！）
 window.uploadOwnPhoto = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        
         compressImage(file, 150, 150, function(compressedDataUrl) {
-            
             if (window.isEditMode && window.currentEditingIndex !== -1) {
                 const index = window.currentEditingIndex;
                 const urlParams = new URLSearchParams(window.location.search);
                 const roomName = urlParams.get('room') || 'default_room';
-                
-                // 💡 Firebase 10.8.0 の標準的なパス指定方法（rooms/部屋名/custom_avatars/custom_番号）
                 if (typeof database !== "undefined" && database) {
                     const customAvatarRef = ref(database, `rooms/${roomName}/custom_avatars/custom_${index}`);
-                    
                     set(customAvatarRef, compressedDataUrl).then(() => {
                         alert(`${index}番目の枠を保存しました！`);
                         window.toggleCustomMode();
                         window.currentEditingIndex = -1;
-                    }).catch((error) => {
-                        console.error("保存エラー:", error);
-                        alert("データベースへの保存でエラーが発生しました。");
-                    });
-                } else if (typeof roomRef !== "undefined" && roomRef) {
-                    // バックアップ：roomRefが使える場合
-                    const customAvatarRef = child(roomRef, `custom_avatars/custom_${index}`);
-                    set(customAvatarRef, compressedDataUrl).then(() => {
-                        alert(`${index}番目の枠を保存しました！`);
-                        window.toggleCustomMode();
-                        window.currentEditingIndex = -1;
-                    });
-                } else {
-                    localStorage.setItem(`customAvatar_${index}`, compressedDataUrl);
-                    alert(`${index}番目の枠をスマホに保存しました！`);
-                    window.toggleCustomMode();
-                    window.currentEditingIndex = -1;
+                    }).catch((error) => { console.error("保存エラー:", error); });
                 }
-
             } else {
-                // 【通常モード】自分の写真を直接アイコンにする処理
-                if (typeof checkUploadLimit === "function" && !checkUploadLimit()) {
-                    alert("本日の変更回数の上限です");
-                    return;
-                }
-
+                if (typeof checkUploadLimit === "function" && !checkUploadLimit()) { alert("本日の変更回数の上限です"); return; }
                 const myPreview = document.getElementById('my-avatar-preview');
                 if (myPreview) myPreview.src = compressedDataUrl;
-                
-                const currentMsg = "新しい写真を設定したよ！📸";
-                if (typeof saveDataToServer === "function") {
-                    saveDataToServer(currentMsg, "");
-                }
-                
+                if (typeof saveDataToServer === "function") { saveDataToServer("新しい写真を設定したよ！📸", ""); }
                 if (typeof reduceUploadCount === "function") reduceUploadCount();
                 window.closeAvatarModal();
             }
         });
     }
-}
+};
 
-// 4. データベースからカスタム画像を自動でリアルタイムに読み込む魔法（10.8.0 完全対応版）
 window.loadCustomAvatars = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomName = urlParams.get('room') || 'default_room';
-    
     if (typeof database !== "undefined" && database) {
         const customAvatarsRef = ref(database, `rooms/${roomName}/custom_avatars`);
-        
-        // リアルタイムにデータベースを見張って、画像データを枠に流し込む
         onValue(customAvatarsRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
                 for (let i = 1; i <= 6; i++) {
                     if (data[`custom_${i}`]) {
                         const presetImg = document.getElementById(`preset-img-${i}`);
-                        if (presetImg) {
-                            presetImg.src = data[`custom_${i}`];
-                        }
-                    }
-                }
-            }
-        });
-    } else if (typeof roomRef !== "undefined" && roomRef) {
-        // バックアップ：roomRefから監視する場合
-        const customAvatarsRef = child(roomRef, 'custom_avatars');
-        onValue(customAvatarsRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                for (let i = 1; i <= 6; i++) {
-                    if (data[`custom_${i}`]) {
-                        const presetImg = document.getElementById(`preset-img-${i}`);
-                        if (presetImg) { presetImg.src = data[`custom_${i}`]; }
+                        if (presetImg) presetImg.src = data[`custom_${i}`];
                     }
                 }
             }
         });
     }
-}
+};
 
-// 画面読み込み時にお見張りスタート！
-document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-        if (typeof window.loadCustomAvatars === "function") {
-            window.loadCustomAvatars();
-        }
-    }, 1000);
-});
 
-// ==========================================================================
-// 💎 【新機能】ステータスボタンの文字をカスタム＆データベース保存する魔法
-// ==========================================================================
+// --- ⚙️ 文字カスタム用の設定群（7つ対応版！） ---
 window.isTextEditMode = false;
 
-// 1. 文字カスタムモードのON/OFFを切り替える魔法
 window.toggleTextCustomMode = function() {
     window.isTextEditMode = !window.isTextEditMode;
     const button = document.getElementById('toggle-text-custom-mode');
-    
     if (window.isTextEditMode) {
         if(button) {
             button.innerText = "文字を選ぶモードに戻る";
-            button.style.backgroundColor = "#9c27b0"; // プレミアム感のある紫
+            button.style.backgroundColor = "#9c27b0";
             button.style.boxShadow = "0 3px 0 #7b1fa2";
         }
         alert("文字のカスタムモードになりました！変更したいボタンをポチッと押してね。");
     } else {
         if(button) {
-            button.innerText = "⚙️ 6つの文字をカスタムする";
-            button.style.backgroundColor = "#888"; // グレー
+            button.innerText = "⚙️ 7つの文字をカスタムする";
+            button.style.backgroundColor = "#888";
             button.style.boxShadow = "0 3px 0 #666";
         }
     }
-}
+};
 
-// 2. ステータスボタンがクリックされたときの魔法
 window.handleTextClick = function(index, defaultText) {
     const urlParams = new URLSearchParams(window.location.search);
     const roomName = urlParams.get('room') || 'default_room';
 
     if (window.isTextEditMode) {
-        // 【カスタムモード】なら、文字を入力させるポップアップを出す
         const currentBtn = document.getElementById(`status-btn-${index}`);
         const currentText = currentBtn ? currentBtn.innerText : defaultText;
-        
         const newText = prompt(`【${index + 1}番目のボタン】新しい文字を入力してね：`, currentText);
         
         if (newText !== null && newText.trim() !== "") {
-            // Firebaseデータベースの「custom_texts」の中に保存する
             if (typeof database !== "undefined" && database) {
                 const textRef = ref(database, `rooms/${roomName}/custom_texts/text_${index}`);
                 set(textRef, newText).then(() => {
-                    alert(`ボタンの文字を「${newText}」に完全保存しました！`);
-                    window.toggleTextCustomMode(); // 通常モードに戻す
-                }).catch((error) => {
-                    console.error("文字保存エラー:", error);
-                });
+                    alert(`ボタンの文字を「${newText}」に保存しました！`);
+                    window.toggleTextCustomMode();
+                }).catch((error) => { console.error("文字保存エラー:", error); });
             }
         }
     } else {
-        // 【通常モード】なら、そのボタンの文字を自分のステータスとして送信する
+        // 通常モードの時は元の changeStatus のようにメッセージを送信！
         const currentBtn = document.getElementById(`status-btn-${index}`);
         const selectedText = currentBtn ? currentBtn.innerText : defaultText;
-        
         if (typeof saveDataToServer === "function") {
-            saveDataToServer(selectedText, ""); // Firebaseに現在の状態を送信
+            saveDataToServer(selectedText, "");
         }
     }
-}
+};
 
-// 3. データベースからカスタムされた文字を自動でリアルタイムに読み込む魔法
 window.loadCustomTexts = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomName = urlParams.get('room') || 'default_room';
-    
     if (typeof database !== "undefined" && database) {
         const customTextsRef = ref(database, `rooms/${roomName}/custom_texts`);
-        
         onValue(customTextsRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
                 for (let i = 0; i < 7; i++) {
                     if (data[`text_${i}`]) {
                         const btn = document.getElementById(`status-btn-${i}`);
-                        if (btn) {
-                            btn.innerText = data[`text_${i}`];
-                        }
+                        if (btn) btn.innerText = data[`text_${i}`];
                     }
                 }
             }
         });
     }
-}
+};
 
-// 画面読み込み時に文字の自動読み込みもお見張りスタート！
+// 🎬 画面起動時にすべてを自動で読み込む
 document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
-        if (typeof window.loadCustomTexts === "function") {
-            window.loadCustomTexts();
-        }
-    }, 1200); // アバターよりほんの少しだけずらして安全に読み込み
+        if (typeof window.loadCustomAvatars === "function") window.loadCustomAvatars();
+        if (typeof window.loadCustomTexts === "function") window.loadCustomTexts();
+    }, 1000);
 });
