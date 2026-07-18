@@ -1,10 +1,10 @@
 // ==========================================================================
-// 🚨 Firebaseの機能をインターネットから読み込む設定（childを追加したよ！）
+// 🚨 Firebaseの機能をインターネットから読み込む設定（スッキリ修正版！）
 // ==========================================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, child, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-import { getDatabase, ref, set, onValue, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";// ⚠️あなたの「秘密の鍵」
+// ⚠️あなたの「秘密の鍵」
 const firebaseConfig = {
     apiKey: "AIzaSyB39eq-VQP8fZNjVdm7BnO7gKEMBibqqDo",
     authDomain: "hana-kehai-app.firebaseapp.com",
