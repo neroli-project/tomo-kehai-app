@@ -599,9 +599,6 @@ window.loadCustomTexts = function() {
     }
 };
 
-// 💡 修正ポイント：ここにあった「自分のデータを画面に映すonValue内の危ない魔法」をここに独立！
-// 画面を開いたその「1回だけ」データを取ってくる仕組み（get）にして、同期バグを完全シャットアウト！
-import { get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 window.loadMyPrivateDataOnce = function() {
     const urlParams = new URLSearchParams(window.location.search);
