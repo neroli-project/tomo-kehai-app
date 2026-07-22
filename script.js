@@ -106,20 +106,27 @@ if (typeof database !== "undefined" && database) {
 let uploadLimit = 100;
 
 // ==========================================================================
-// 🛠️ 自分のデータをFirebaseに送信（保存）する共通関数（写真上書き事故ガード版）
+// 🛡️ 【全消去事故を100%防ぐ】絶対上書きさせない最強保存関数！
 // ==========================================================================
 window.saveDataToServer = function(messageText, effectEmoji) {
     if (!myRef) return;
-    
-    // 💡 1. 画面のプレビュー画像を取得
-    let currentAvatarSrc = document.getElementById('my-avatar-preview') ? document.getElementById('my-avatar-preview').src : "";
     
     const statusElement = document.getElementById('my-current-status');
     if (statusElement) {
         statusElement.innerText = messageText;
     }
     
-    // 💡 2. もし画面の画像が初期画像や空っぽなら、Firebase上の最新写真を壊さないように「写真以外のデータ（メッセージ等）」だけを安全に更新する魔法！
+    // 💡 set ではなく update を使うことで、保存済みの写真（avatar）を絶対に消さずにメッセージだけを更新する！
+    update(myRef, {
+        message: messageText,
+        effect: effectEmoji || "",
+        checked: false
+    }).then(() => {
+        console.log("メッセージの安全更新に成功！");
+    }).catch((error) => {
+        console.error("送信エラー:", error);
+    });
+};    // 💡 2. もし画面の画像が初期画像や空っぽなら、Firebase上の最新写真を壊さないように「写真以外のデータ（メッセージ等）」だけを安全に更新する魔法！
     if (!currentAvatarSrc || currentAvatarSrc.includes('default') || currentAvatarSrc === window.location.href) {
         // 写真は上書きせず、メッセージとエフェクトだけを更新！
         update(myRef, {
