@@ -367,28 +367,41 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 📸 自分の写真をアップロードして設定する魔法（最新完全保存版）
+// 📸 自分の写真をアップロードして確定保存する魔法（更新ガード完全版）
 window.uploadOwnPhoto = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
         
-        // 写真を軽量化して保存する（圧縮して安全にFirebaseへ送る）
         compressImage(file, 150, 150, function(compressedDataUrl) {
-            // 1. プレビューの画面を書き換える
+            // 1. まず画面のプレビューを変える
             const myPreview = document.getElementById('my-avatar-preview');
             if (myPreview) myPreview.src = compressedDataUrl;
 
-            // 2. 制限を気にせず、Firebaseへ送信＆完全保存！
-            if (typeof saveDataToServer === "function") {
-                saveDataToServer("新しい写真を設定したよ！📸", "");
-            }
+            // 2. Firebaseに「絶対にこの写真を保存して！」と直接命令を送る
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomName = urlParams.get('room') || 'default_room';
+            const userName = urlParams.get('myname') || 'default_user';
 
-            // 3. モーダルを閉じる
-            window.closeAvatarModal();
+            if (typeof database !== "undefined" && database && myRef) {
+                // saveDataToServerの完了を待たず、アバター画像を直接Firebaseに即時保存！
+                set(myRef, {
+                    avatar: compressedDataUrl,
+                    message: "新しい写真を設定したよ！📸",
+                    checked: false
+                }).then(() => {
+                    console.log("Firebaseへの写真保存が完全に完了しました！");
+                    alert("写真の変更を完全保存したよ！これで更新しても消えません✨");
+                    window.closeAvatarModal();
+                }).catch((error) => {
+                    console.error("写真の保存エラー:", error);
+                    alert("保存でエラーが発生しちゃったかも…");
+                });
+            } else {
+                window.closeAvatarModal();
+            }
         });
     }
-}
-// ==========================================================================
+};// ==========================================================================
 // 💡 【バグ修正完了版】アバター枠・文字カスタム・自分専用完全分離魔法！
 // ==========================================================================
 
