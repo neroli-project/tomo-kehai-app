@@ -106,31 +106,43 @@ if (typeof database !== "undefined" && database) {
 let uploadLimit = 100;
 
 // ==========================================================================
-// 🛠️ 共通で使う大事な関数
+// 🛠️ 自分のデータをFirebaseに送信（保存）する共通関数（写真上書き事故ガード版）
 // ==========================================================================
-
-// 自分のデータをFirebaseに送信（保存）する共通関数
 window.saveDataToServer = function(messageText, effectEmoji) {
     if (!myRef) return;
-    const currentAvatarSrc = document.getElementById('my-avatar-preview').src;
+    
+    // 💡 1. 画面のプレビュー画像を取得
+    let currentAvatarSrc = document.getElementById('my-avatar-preview') ? document.getElementById('my-avatar-preview').src : "";
     
     const statusElement = document.getElementById('my-current-status');
     if (statusElement) {
         statusElement.innerText = messageText;
     }
     
-    set(myRef, {
-        avatar: currentAvatarSrc,
-        message: messageText,
-        effect: effectEmoji || "",
-        checked: false
-    }).then(() => {
-        console.log("Firebaseへの送信に成功！:", messageText);
-    }).catch((error) => {
-        console.error("Firebaseへの送信でエラー:", error);
-    });
-}
-
+    // 💡 2. もし画面の画像が初期画像や空っぽなら、Firebase上の最新写真を壊さないように「写真以外のデータ（メッセージ等）」だけを安全に更新する魔法！
+    if (!currentAvatarSrc || currentAvatarSrc.includes('default') || currentAvatarSrc === window.location.href) {
+        // 写真は上書きせず、メッセージとエフェクトだけを更新！
+        update(myRef, {
+            message: messageText,
+            effect: effectEmoji || "",
+            checked: false
+        }).then(() => {
+            console.log("メッセージの安全更新に成功！");
+        }).catch((error) => console.error("送信エラー:", error));
+    } else {
+        // ちゃんと新しい写真が入っている時だけ、写真も含めて保存！
+        set(myRef, {
+            avatar: currentAvatarSrc,
+            message: messageText,
+            effect: effectEmoji || "",
+            checked: false
+        }).then(() => {
+            console.log("Firebaseへの全送信に成功！:", messageText);
+        }).catch((error) => {
+            console.error("Firebaseへの送信でエラー:", error);
+        });
+    }
+};
 // ==========================================================================
 // 🛠️ 共通で使う大事な関数（確実に外から見えるように修正したよ！）
 // ==========================================================================
