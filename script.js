@@ -449,14 +449,26 @@ window.handleAvatarClick = function(index, presetId) {
             alert("本日の変更回数の上限（3回）に達したため、変更できません。");
             return;
         }
+        
+        // 💡 1. 押した枠の画像を「今すぐ」取得！
         const img = document.getElementById(`preset-img-${index}`);
         const customSrc = img ? img.src : null;
-        window.selectPresetAvatar(presetId, customSrc);
+
+        if (customSrc) {
+            // 💡 2. 通信を待たずに、画面のアイコンを【コンマ0秒で即座に書き換える！】
+            const myPreview = document.getElementById('my-avatar-preview');
+            if (myPreview) myPreview.src = customSrc;
+
+            // 💡 3. それから裏でFirebaseへ送信！
+            if (typeof saveDataToServer === "function") {
+                saveDataToServer("新しい写真を設定したよ！📸", "");
+            }
+        }
+
         if (typeof reduceUploadCount === "function") reduceUploadCount();
         if (typeof window.closeAvatarModal === "function") window.closeAvatarModal();
     }
 };
-
 function compressImage(file, maxWidth, maxHeight, callback) {
     const reader = new FileReader();
     reader.onload = function(event) {
