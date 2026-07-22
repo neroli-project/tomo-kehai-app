@@ -388,20 +388,19 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 📸 自分の写真をアップロードして【選んだ瞬間に即パッと反映】させる魔法！
+// 📸 自分の写真をアップロードして【直接Firebaseに完全保存】させる魔法！
 window.uploadOwnPhoto = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
         
         compressImage(file, 150, 150, function(compressedDataUrl) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomName = urlParams.get('room') || 'default_room';
+            const userName = urlParams.get('myname') || 'default_user';
+
             // 💡 1. カスタム枠の編集モード中かどうかの判定
             if (window.isEditMode && window.currentEditingIndex !== -1) {
                 const index = window.currentEditingIndex;
-                const urlParams = new URLSearchParams(window.location.search);
-                const roomName = urlParams.get('room') || 'default_room';
-                const userName = urlParams.get('myname') || 'default_user';
-                
-                // モーダルの中の枠の画像を「今すぐ」書き換える！
                 const presetImg = document.getElementById(`preset-img-${index}`);
                 if (presetImg) presetImg.src = compressedDataUrl;
 
@@ -415,22 +414,31 @@ window.uploadOwnPhoto = function(input) {
                 }
             } else {
                 // 💡 2. 通常の「アバター変更」のとき
-                // 画面のアバタープレビューを【選んだその瞬間に即座に書き換える！】
+                // 画面のプレビューを即座に書き換え！
                 const myPreview = document.getElementById('my-avatar-preview');
                 if (myPreview) myPreview.src = compressedDataUrl;
 
-                // Firebaseにも送信して確定保存！
-                if (typeof saveDataToServer === "function") {
-                    saveDataToServer("新しい写真を設定したよ！📸", "");
+                // 💡 Firebaseへ最新の写真を「直接」確実に上書き保存する！
+                if (typeof database !== "undefined" && database) {
+                    const myPrivateRef = ref(database, `rooms/${roomName}/users/${userName}`);
+                    set(myPrivateRef, {
+                        avatar: compressedDataUrl, // 最新の写真をそのままセット！
+                        message: "新しい写真を設定したよ！📸",
+                        checked: false
+                    }).then(() => {
+                        console.log("Firebaseに最新写真の直接保存成功！");
+                        window.closeAvatarModal();
+                    }).catch((error) => {
+                        console.error("保存エラー:", error);
+                        window.closeAvatarModal();
+                    });
+                } else {
+                    window.closeAvatarModal();
                 }
-                
-                // モーダルを閉じる
-                window.closeAvatarModal();
             }
         });
     }
 };
-
 // ==========================================================================
 // 💡 【バグ修正完了版】アバター枠・文字カスタム・自分専用完全分離魔法！
 // ==========================================================================
@@ -652,9 +660,7 @@ window.loadCustomTexts = function() {
 };
 
 
-// ==========================================================================
-// 🛡️ 【絶対全消しさせない！】自分専用データ安全読み込み魔法
-// ==========================================================================
+// 🛡️ 【絶対全消しさせない！】自分専用データ安全読み込み魔法（完全版）
 window.loadMyPrivateDataOnce = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomName = urlParams.get('room') || 'default_room';
@@ -664,13 +670,15 @@ window.loadMyPrivateDataOnce = function() {
         const myPrivateRef = ref(database, `rooms/${roomName}/users/${userName}`);
         
         get(myPrivateRef).then((snapshot) => {
-            if (snapshot.exists()) { // 💡 ちゃんとデータが存在するときだけ動く！
+            if (snapshot.exists()) {
                 const data = snapshot.val();
                 if (data) {
+                    // 1. 最新の写真があれば画面に反映！
                     if (data.avatar) {
                         const myPreview = document.getElementById('my-avatar-preview');
                         if (myPreview) myPreview.src = data.avatar;
                     }
+                    // 2. 最新のメッセージがあれば画面に反映！
                     if (data.message) {
                         const myStatus = document.getElementById('my-current-status');
                         if (myStatus) myStatus.innerText = data.message;
@@ -681,14 +689,11 @@ window.loadMyPrivateDataOnce = function() {
             console.error("読み込みエラー:", error);
         });
     }
-};
-
-// 🎬 起動時に安全に読み込む
+};// 🎬 起動時に安全に読み込む（古い記憶による上書きを完全阻止！）
 document.addEventListener("DOMContentLoaded", () => {
-    // 1秒待ってから、データがある場合のみ画面を更新する
     setTimeout(() => {
         if (typeof window.loadCustomAvatars === "function") window.loadCustomAvatars();
-        if (typeof window.loadCustomTexts === "function") window.loadCustomTexts();
+        // 💡 古い文字読み込み（loadCustomTexts）を削除して、Firebaseの最新データだけを読む！
         if (typeof window.loadMyPrivateDataOnce === "function") window.loadMyPrivateDataOnce();
     }, 500);
 });
