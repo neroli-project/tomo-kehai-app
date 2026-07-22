@@ -606,34 +606,43 @@ window.loadCustomTexts = function() {
 };
 
 
+// ==========================================================================
+// 💡 【完全解決版】自分専用のデータを確実にロードして画面に映す魔法！
+// ==========================================================================
 window.loadMyPrivateDataOnce = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomName = urlParams.get('room') || 'default_room';
     const userName = urlParams.get('myname') || 'default_user';
     
     if (typeof database !== "undefined" && database) {
+        // 分離された自分専用の引き出しを見に行く
         const myPrivateRef = ref(database, `rooms/${roomName}/users/${userName}`);
+        
         get(myPrivateRef).then((snapshot) => {
             const data = snapshot.val();
             if (data) {
+                // 1. 写真データがあればプレビューを差し替える！
                 if (data.avatar) {
                     const myPreview = document.getElementById('my-avatar-preview');
                     if (myPreview) myPreview.src = data.avatar;
                 }
+                // 2. メッセージがあれば状態を差し替える！
                 if (data.message) {
                     const myStatus = document.getElementById('my-current-status');
                     if (myStatus) myStatus.innerText = data.message;
                 }
             }
+        }).catch((error) => {
+            console.error("データ読み込みエラー:", error);
         });
     }
 };
 
-// 🎬 画面起動時にすべてを自動で読み込む
+// 🎬 画面が開いた瞬間に実行（待ち時間を1秒→0.3秒に短縮してタイムラグを激減！）
 document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         if (typeof window.loadCustomAvatars === "function") window.loadCustomAvatars();
         if (typeof window.loadCustomTexts === "function") window.loadCustomTexts();
         if (typeof window.loadMyPrivateDataOnce === "function") window.loadMyPrivateDataOnce();
-    }, 1000);
+    }, 300);
 });
