@@ -450,23 +450,27 @@ window.handleAvatarClick = function(index, presetId) {
             return;
         }
         
-        // 💡 1. 押した枠の画像を「今すぐ」取得！
+        // 1. 押した枠の画像を「今すぐ」取得！
         const img = document.getElementById(`preset-img-${index}`);
         const customSrc = img ? img.src : null;
 
         if (customSrc) {
-            // 💡 2. 通信を待たずに、画面のアイコンを【コンマ0秒で即座に書き換える！】
+            // 2. 画面のアイコンを即座に書き換え！
             const myPreview = document.getElementById('my-avatar-preview');
             if (myPreview) myPreview.src = customSrc;
 
-            // 💡 3. それから裏でFirebaseへ送信！
+            // 3. 裏でFirebaseへ送信！
             if (typeof saveDataToServer === "function") {
                 saveDataToServer("新しい写真を設定したよ！📸", "");
             }
         }
 
         if (typeof reduceUploadCount === "function") reduceUploadCount();
-        if (typeof window.closeAvatarModal === "function") window.closeAvatarModal();
+
+        // 💡 4. 0.15秒だけ「選んだよ！」の余韻を作ってからシュッと閉じる魔法！
+        setTimeout(() => {
+            if (typeof window.closeAvatarModal === "function") window.closeAvatarModal();
+        }, 150);
     }
 };
 function compressImage(file, maxWidth, maxHeight, callback) {
