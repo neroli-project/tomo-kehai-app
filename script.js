@@ -20,26 +20,28 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // ==========================================================================
-// 🚨 URLからお部屋の名前と自分の名前を読み取る設定
+// 🚨 URLからお部屋の名前と自分の名前を読み取る設定（名札の統一完全版！）
 // ==========================================================================
 const urlParams = new URLSearchParams(window.location.search);
-const roomId = urlParams.get('room');
-const myId = urlParams.get('myname');
+const roomId = urlParams.get('room') || 'default_room';
+const myId = urlParams.get('myname') || 'default_user';
 
-// 💡部屋名か名前が空っぽなら、ログイン画面を表示して処理をストップする！
-if (!roomId || !myId) {
+// 💡 部屋名か名前が実際にURLにない時だけログイン画面を出す
+if (!urlParams.get('room') || !urlParams.get('myname')) {
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('login-container').style.display = 'block';
-        document.getElementById('app-container').style.display = 'none';
+        const loginCon = document.getElementById('login-container');
+        const appCon = document.getElementById('app-container');
+        if (loginCon) loginCon.style.display = 'block';
+        if (appCon) appCon.style.display = 'none';
     });
 } else {
-    // 部屋名と名前がある時だけ、いつものお部屋を表示する！
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('login-container').style.display = 'none';
-        document.getElementById('app-container').style.display = 'block';
+        const loginCon = document.getElementById('login-container');
+        const appCon = document.getElementById('app-container');
+        if (loginCon) loginCon.style.display = 'none';
+        if (appCon) appCon.style.display = 'block';
     });
 }
-
 // ==========================================================================
 // 🔑 ログイン＆招待リンク生成の処理
 // ==========================================================================
@@ -92,15 +94,16 @@ window.goToRoomActual = function() {
 }
 
 // ==========================================================================
-// 🔗 Firebaseデータベースへの接続設定（部屋情報があるときだけ動くようにするよ）
+// 🔗 Firebaseデータベースへの接続設定（絶対にブレない一本化アドレス）
 // ==========================================================================
 let myRef, roomRef;
-if (roomId && myId) {
+if (typeof database !== "undefined" && database) {
     myRef = ref(database, `rooms/${roomId}/users/${myId}`);
     roomRef = ref(database, `rooms/${roomId}/users`);
 }
 
-let uploadLimit = 3;
+// 制限回数（リセット事故を防ぐため100回にしておくよ！）
+let uploadLimit = 100;
 
 // ==========================================================================
 // 🛠️ 共通で使う大事な関数
