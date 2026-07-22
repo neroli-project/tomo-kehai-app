@@ -504,7 +504,7 @@ window.uploadOwnPhoto = function(input) {
     }
 };
 
-// 💡 修正ポイント：読み込み時も「自分専用のフォルダ」から画像を取ってくるようにしたよ！
+// 💡 【上書きバグ防止版】カスタム枠だけを安全に読み込む魔法！
 window.loadCustomAvatars = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomName = urlParams.get('room') || 'default_room';
@@ -512,20 +512,26 @@ window.loadCustomAvatars = function() {
     
     if (typeof database !== "undefined" && database) {
         const customAvatarsRef = ref(database, `rooms/${roomName}/users/${userName}/custom_avatars`);
-        onValue(customAvatarsRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                for (let i = 1; i <= 6; i++) {
-                    if (data[`custom_${i}`]) {
-                        const presetImg = document.getElementById(`preset-img-${i}`);
-                        if (presetImg) presetImg.src = data[`custom_${i}`];
+        
+        // onValue ではなく get（1回だけ読み込み）にしてループ上書き事故をガード！
+        if (typeof get === "function") {
+            get(customAvatarsRef).then((snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    for (let i = 1; i <= 6; i++) {
+                        // 枠データが存在するときだけ、枠（preset-img）の画像を変更する！
+                        if (data[`custom_${i}`]) {
+                            const presetImg = document.getElementById(`preset-img-${i}`);
+                            if (presetImg) presetImg.src = data[`custom_${i}`];
+                        }
                     }
                 }
-            }
-        });
+            }).catch((error) => {
+                console.error("枠画像読み込みエラー:", error);
+            });
+        }
     }
 };
-
 
 // --- ⚙️ 文字カスタム用の設定群（こちらも自分専用に分離！） ---
 window.isTextEditMode = false;
