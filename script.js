@@ -621,3 +621,53 @@ document.addEventListener("DOMContentLoaded", () => {
         if (typeof window.loadMyPrivateDataOnce === "function") window.loadMyPrivateDataOnce();
     }, 500);
 });
+
+
+// ==========================================================================
+// ✏️ カスタムテキスト（ボタンの文字）を自由に変更・保存する魔法
+// ==========================================================================
+
+// 💡 1. Firebaseから保存されたカスタム文字を読み込む
+window.loadCustomTexts = function() {
+    if (typeof database !== "undefined" && database) {
+        const customTextsRef = ref(database, `rooms/${roomId}/users/${myId}/custom_texts`);
+        get(customTextsRef).then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                for (let i = 0; i < 7; i++) {
+                    if (data[`text_${i}`]) {
+                        const btn = document.getElementById(`status-btn-${i}`);
+                        if (btn) btn.innerText = data[`text_${i}`];
+                    }
+                }
+            }
+        }).catch((error) => console.error("文字読み込みエラー:", error));
+    }
+};
+
+// 💡 2. ボタンの文字を長押し（または編集モード）で変更する処理
+window.editStatusButtonText = function(index) {
+    const btn = document.getElementById(`status-btn-${index}`);
+    const currentText = btn ? btn.innerText : "";
+    
+    const newText = prompt("新しいボタンの文字を入力してね！", currentText);
+    
+    if (newText && newText.trim() !== "") {
+        if (btn) btn.innerText = newText;
+        
+        // Firebaseに安全に保存！
+        if (typeof database !== "undefined" && database) {
+            const textRef = ref(database, `rooms/${roomId}/users/${myId}/custom_texts/text_${index}`);
+            set(textRef, newText).then(() => {
+                console.log(`ボタン ${index} の文字を更新したよ！:`, newText);
+            }).catch((error) => console.error("文字保存エラー:", error));
+        }
+    }
+};
+
+// 🎬 画面を開いたときにカスタム文字を自動セット
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        if (typeof window.loadCustomTexts === "function") window.loadCustomTexts();
+    }, 800);
+});
