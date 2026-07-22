@@ -180,7 +180,9 @@ window.openAvatarModal = function() {
 window.closeAvatarModal = function() { 
     const modal = document.getElementById('avatar-modal');
     if (modal) modal.style.display = 'none'; 
-}// ==========================================================================
+}
+
+// ==========================================================================
 // 📡 部屋にいる「自分以外の人（相手）」＆「自分自身」のデータを自動で画面に映す
 // ==========================================================================
 if (roomRef) {
@@ -272,41 +274,60 @@ window.sendStatus = function() {
     window.saveDataToServer(statusText, '✨🎉✨');
     messageInput.value = "";
 }
-// ✨ アバターを選んだときの処理（スマホでのリセット完全ガード版！）
+// ✨ アバターを選んだときの処理（超軽量化＆即時反映の決定版！）
 window.selectPresetAvatar = function(presetId, customSrc) {
-    // もしカスタムされた画像URLがあればそれを使い、なければ元の画像パスを使う
     const finalAvatarSrc = customSrc || `image/${presetId}.png`;
     
-    // 1. 自分のプレビュー画像を書き換える
+    // 💡 1. 画面のプレビュー画像を【押したコンマ0秒後】に即座に書き換える！
     const myPreview = document.getElementById('my-avatar-preview');
     if (myPreview) {
         myPreview.src = finalAvatarSrc;
     }
     
-    // 2. サーバー（Firebase）に直接「新しい画像」を指定して確実に保存する！
     const currentMsg = "アバターを変えたよ";
     
     if (typeof myRef !== "undefined" && myRef && typeof set === "function") {
-        // 💡 時差をなくすために、画面のプレビューを待たずに「決定した画像URL」を直接Firebaseに送りつけるよ！
-        set(myRef, {
-            avatar: finalAvatarSrc, // 新しい画像を確実に指定！
-            message: currentMsg,
-            effect: "",
-            checked: false
-        }).then(() => {
-            console.log("アバターのFirebase保存に成功！:", finalAvatarSrc);
-        }).catch((error) => {
-            console.error("アバターのFirebase保存エラー:", error);
-        });
-    } else {
-        // バックアップ用（もし上の直接保存が動かない場合は元の関数を呼ぶ）
-        if (typeof saveDataToServer === "function") {
-            saveDataToServer(currentMsg, "");
-        } else if (typeof window.saveDataToServer === "function") {
-            window.saveDataToServer(currentMsg, "");
+        // 💡 2. データサイズが大きい画像（data:image...）なら超高倍率で圧縮してFirebaseの容量オーバーを防ぐ！
+        if (finalAvatarSrc.startsWith('data:image')) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                // 100x100ピクセルの超軽量サイズにする
+                canvas.width = 100;
+                canvas.height = 100;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, 100, 100);
+                
+                // 画質を極限まで軽量化（これなら何十回更新しても消えない！）
+                const tinyAvatarSrc = canvas.toDataURL('image/jpeg', 0.5);
+                
+                // 画面を最新の超軽量画像に差し替え
+                if (myPreview) myPreview.src = tinyAvatarSrc;
+
+                // Firebaseに確実に送信！
+                set(myRef, {
+                    avatar: tinyAvatarSrc,
+                    message: currentMsg,
+                    effect: "",
+                    checked: false
+                }).then(() => {
+                    console.log("超軽量アバターの保存成功！");
+                }).catch((error) => {
+                    console.error("保存エラー:", error);
+                });
+            };
+            img.src = finalAvatarSrc;
+        } else {
+            // 普通の画像ファイルパス（image/1.png など）の場合はそのまま送信！
+            set(myRef, {
+                avatar: finalAvatarSrc,
+                message: currentMsg,
+                effect: "",
+                checked: false
+            }).catch((error) => console.error("保存エラー:", error));
         }
     }
-}
+};
 // ==========================================================================
 // 🔍 写真をタップした時に大きく拡大する魔法
 // ==========================================================================
