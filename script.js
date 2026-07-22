@@ -126,7 +126,7 @@ window.saveDataToServer = function(messageText, effectEmoji) {
     }).catch((error) => {
         console.error("送信エラー:", error);
     });
-};    // 💡 2. もし画面の画像が初期画像や空っぽなら、Firebase上の最新写真を壊さないように「写真以外のデータ（メッセージ等）」だけを安全に更新する魔法！
+  // 💡 2. もし画面の画像が初期画像や空っぽなら、Firebase上の最新写真を壊さないように「写真以外のデータ（メッセージ等）」だけを安全に更新する魔法！
     if (!currentAvatarSrc || currentAvatarSrc.includes('default') || currentAvatarSrc === window.location.href) {
         // 写真は上書きせず、メッセージとエフェクトだけを更新！
         update(myRef, {
