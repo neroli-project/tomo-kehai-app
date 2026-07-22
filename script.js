@@ -166,21 +166,21 @@ window.saveDataToServer = function(messageText, effectEmoji) {
     });
 }
 
-// ポップアップ開閉（開く瞬間にカスタム写真を強制リロードする魔法を追加！）
+// 🚪 ポップアップ開閉の魔法（勝手な上書きをストップ！）
 window.openAvatarModal = function() { 
-    // 💡 ポップアップを開く前に、過去にカスタムした写真をLocalStorageから確実に読み込む！
+    // カスタム枠の最新状態だけを安全にセット
     if (typeof window.loadCustomAvatars === "function") {
         window.loadCustomAvatars();
     }
-    
     // ポップアップを表示する
-    document.getElementById('avatar-modal').style.display = 'flex'; 
+    const modal = document.getElementById('avatar-modal');
+    if (modal) modal.style.display = 'flex'; 
 }
 
 window.closeAvatarModal = function() { 
-    document.getElementById('avatar-modal').style.display = 'none'; 
-}
-// ==========================================================================
+    const modal = document.getElementById('avatar-modal');
+    if (modal) modal.style.display = 'none'; 
+}// ==========================================================================
 // 📡 部屋にいる「自分以外の人（相手）」＆「自分自身」のデータを自動で画面に映す
 // ==========================================================================
 if (roomRef) {
@@ -367,40 +367,27 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ==========================================================================
-// 📸 【復活！】自分の写真を読み込んでセットする魔法
-// ==========================================================================
+// 📸 自分の写真をアップロードして設定する魔法（最新完全保存版）
 window.uploadOwnPhoto = function(input) {
-    if (!checkUploadLimit()) {
-        alert("本日の変更回数の上限です");
-        return;
-    }
-
-    // 写真がちゃんと選ばれているかチェック
     if (input.files && input.files[0]) {
-        const reader = new FileReader();
+        const file = input.files[0];
+        
+        // 写真を軽量化して保存する（圧縮して安全にFirebaseへ送る）
+        compressImage(file, 150, 150, function(compressedDataUrl) {
+            // 1. プレビューの画面を書き換える
+            const myPreview = document.getElementById('my-avatar-preview');
+            if (myPreview) myPreview.src = compressedDataUrl;
 
-        // 写真の読み込みが完了した時の処理
-        reader.onload = function(e) {
-            // 自分のアバタープレビューを、選んだ写真に書き換える
-            document.getElementById('my-avatar-preview').src = e.target.result;
+            // 2. 制限を気にせず、Firebaseへ送信＆完全保存！
+            if (typeof saveDataToServer === "function") {
+                saveDataToServer("新しい写真を設定したよ！📸", "");
+            }
 
-            // Firebaseのサーバーにも、この写真のデータを送信する
-            const currentMsg = "新しい写真を設定したよ！📸";
-            window.saveDataToServer(currentMsg, "");
-
-            // 制限回数を減らしてモーダルを閉じる
-            reduceUploadCount();
+            // 3. モーダルを閉じる
             window.closeAvatarModal();
-        };
-
-        // 写真をデータとして読み込む
-        reader.readAsDataURL(input.files[0]);
+        });
     }
 }
-
-
-
 // ==========================================================================
 // 💡 【バグ修正完了版】アバター枠・文字カスタム・自分専用完全分離魔法！
 // ==========================================================================
