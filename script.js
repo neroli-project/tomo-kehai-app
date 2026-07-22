@@ -367,41 +367,50 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 📸 自分の写真をアップロードして確定保存する魔法（更新ガード完全版）
+// 📸 自分の写真をアップロードして【選んだ瞬間に即パッと反映】させる魔法！
 window.uploadOwnPhoto = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
         
         compressImage(file, 150, 150, function(compressedDataUrl) {
-            // 1. まず画面のプレビューを変える
-            const myPreview = document.getElementById('my-avatar-preview');
-            if (myPreview) myPreview.src = compressedDataUrl;
+            // 💡 1. カスタム枠の編集モード中かどうかの判定
+            if (window.isEditMode && window.currentEditingIndex !== -1) {
+                const index = window.currentEditingIndex;
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomName = urlParams.get('room') || 'default_room';
+                const userName = urlParams.get('myname') || 'default_user';
+                
+                // モーダルの中の枠の画像を「今すぐ」書き換える！
+                const presetImg = document.getElementById(`preset-img-${index}`);
+                if (presetImg) presetImg.src = compressedDataUrl;
 
-            // 2. Firebaseに「絶対にこの写真を保存して！」と直接命令を送る
-            const urlParams = new URLSearchParams(window.location.search);
-            const roomName = urlParams.get('room') || 'default_room';
-            const userName = urlParams.get('myname') || 'default_user';
-
-            if (typeof database !== "undefined" && database && myRef) {
-                // saveDataToServerの完了を待たず、アバター画像を直接Firebaseに即時保存！
-                set(myRef, {
-                    avatar: compressedDataUrl,
-                    message: "新しい写真を設定したよ！📸",
-                    checked: false
-                }).then(() => {
-                    console.log("Firebaseへの写真保存が完全に完了しました！");
-                    alert("写真の変更を完全保存したよ！これで更新しても消えません✨");
-                    window.closeAvatarModal();
-                }).catch((error) => {
-                    console.error("写真の保存エラー:", error);
-                    alert("保存でエラーが発生しちゃったかも…");
-                });
+                if (typeof database !== "undefined" && database) {
+                    const customAvatarRef = ref(database, `rooms/${roomName}/users/${userName}/custom_avatars/custom_${index}`);
+                    set(customAvatarRef, compressedDataUrl).then(() => {
+                        alert(`${index}番目の枠を保存したよ！`);
+                        window.toggleCustomMode();
+                        window.currentEditingIndex = -1;
+                    }).catch((error) => { console.error("保存エラー:", error); });
+                }
             } else {
+                // 💡 2. 通常の「アバター変更」のとき
+                // 画面のアバタープレビューを【選んだその瞬間に即座に書き換える！】
+                const myPreview = document.getElementById('my-avatar-preview');
+                if (myPreview) myPreview.src = compressedDataUrl;
+
+                // Firebaseにも送信して確定保存！
+                if (typeof saveDataToServer === "function") {
+                    saveDataToServer("新しい写真を設定したよ！📸", "");
+                }
+                
+                // モーダルを閉じる
                 window.closeAvatarModal();
             }
         });
     }
-};// ==========================================================================
+};
+
+// ==========================================================================
 // 💡 【バグ修正完了版】アバター枠・文字カスタム・自分専用完全分離魔法！
 // ==========================================================================
 
